@@ -1,0 +1,607 @@
+openapi: 3.0.3
+info:
+  title: Autoquímicos - Sistema de Gestión de Salas
+  description: |
+    API REST para el sistema de gestión de salas de conferencias de Autoquímicos S.A. de C.V.
+    
+    ## Características
+    - Gestión de usuarios con roles (Administrador, Aprobador, Organizador, Recepción)
+    - Reservas de salas con flujo de aprobación
+    - Sistema de coffee break automático
+    - Check-in y control de asistencia
+    - Auditoría completa de acciones
+    - Reportes y estadísticas
+    
+    ## Autenticación
+    La API utiliza JWT (JSON Web Tokens) para autenticación. Incluye el token en el header:
+    ```
+    Authorization: Bearer <token>
+    ```
+    
+  version: 1.0.0
+  contact:
+    name: Autoquímicos S.A. de C.V.
+    email: admin@autoquimicos.com
+  license:
+    name: Propietario
+    
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor de desarrollo
+  - url: https://api.autoquimicos.com/api
+    description: Servidor de producción
+
+tags:
+  - name: Autenticación
+    description: Endpoints para login y gestión de tokens
+  - name: Usuarios
+    description: Gestión de usuarios del sistema
+  - name: Salas
+    description: Gestión de salas de conferencias
+  - name: Reservas
+    description: Gestión de reservas y aprobaciones
+  - name: Reportes
+    description: Estadísticas y reportes del sistema
+  - name: Auditoría
+    description: Logs y auditoría del sistema
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      
+  schemas:
+    User:
+      type: object
+      properties:
+        id_usuario:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: "Juan Pérez"
+        correo:
+          type: string
+          format: email
+          example: "juan@autoquimicos.com"
+        telefono:
+          type: string
+          example: "555-0123"
+        role:
+          type: string
+          enum: [administrador, aprobador, organizador, recepcion]
+          example: "organizador"
+        activo:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          
+    Room:
+      type: object
+      properties:
+        id_sala:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: "Sala Ejecutiva"
+        capacidad:
+          type: integer
+          example: 12
+        descripcion:
+          type: string
+          example: "Sala principal para reuniones ejecutivas"
+        activa:
+          type: boolean
+          example: true
+          
+    Reservation:
+      type: object
+      properties:
+        id_reserva:
+          type: integer
+          example: 1
+        titulo:
+          type: string
+          example: "Reunión de ventas"
+        asistentes:
+          type: integer
+          example: 8
+        fecha:
+          type: string
+          format: date
+          example: "2024-12-10"
+        hora_inicio:
+          type: string
+          format: time
+          example: "09:00:00"
+        hora_fin:
+          type: string
+          format: time
+          example: "11:00:00"
+        require_coffee:
+          type: boolean
+          example: true
+        status_name:
+          type: string
+          enum: [pendiente, aprobada, rechazada, cancelada, completada]
+        organizer_name:
+          type: string
+          example: "Juan Pérez"
+        room_name:
+          type: string
+          example: "Sala Ejecutiva"
+          
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error interno del servidor"
+        message:
+          type: string
+          example: "Descripción detallada del error"
+          
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operación exitosa"
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Autenticación
+      summary: Iniciar sesión
+      description: Autentica un usuario y devuelve un token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "admin@autoquimicos.com"
+                password:
+                  type: string
+                  example: "admin123"
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Inicio de sesión exitoso"
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verify:
+    get:
+      tags:
+        - Autenticación
+      summary: Verificar token
+      description: Verifica si un token JWT es válido
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Token válido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  valid:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /users/profile:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtener perfil actual
+      description: Obtiene el perfil del usuario autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /rooms:
+    get:
+      tags:
+        - Salas
+      summary: Listar salas
+      description: Obtiene todas las salas activas
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de salas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 2
+                  rooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Room'
+
+  /rooms/available/search:
+    get:
+      tags:
+        - Salas
+      summary: Buscar salas disponibles
+      description: Busca salas disponibles para un horario específico
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2024-12-10"
+        - name: hora_inicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: time
+          example: "09:00:00"
+        - name: hora_fin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: time
+          example: "11:00:00"
+        - name: minCapacity
+          in: query
+          schema:
+            type: integer
+          example: 8
+      responses:
+        '200':
+          description: Salas disponibles encontradas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 1
+                  rooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Room'
+
+  /reservations:
+    get:
+      tags:
+        - Reservas
+      summary: Listar reservas
+      description: Obtiene reservas con filtros opcionales
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: roomId
+          in: query
+          schema:
+            type: integer
+          example: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pendiente, aprobada, rechazada, cancelada, completada]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lista de reservas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 5
+                  reservations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reservation'
+
+    post:
+      tags:
+        - Reservas
+      summary: Crear reserva
+      description: Crea una nueva reserva de sala
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - idSala
+                - titulo
+                - asistentes
+                - fecha
+                - horaInicio
+                - horaFin
+              properties:
+                idSala:
+                  type: integer
+                  example: 1
+                titulo:
+                  type: string
+                  example: "Reunión de ventas"
+                asistentes:
+                  type: integer
+                  example: 8
+                fecha:
+                  type: string
+                  format: date
+                  example: "2024-12-10"
+                horaInicio:
+                  type: string
+                  format: time
+                  example: "09:00:00"
+                horaFin:
+                  type: string
+                  format: time
+                  example: "11:00:00"
+                requireCoffee:
+                  type: boolean
+                  example: true
+      responses:
+        '201':
+          description: Reserva creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Reserva creada exitosamente"
+                  reservation:
+                    $ref: '#/components/schemas/Reservation'
+
+  /reservations/{id}/approve:
+    post:
+      tags:
+        - Reservas
+      summary: Aprobar reserva
+      description: Aprueba una reserva pendiente (solo Aprobadores)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Reserva aprobada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Reserva aprobada exitosamente"
+                  reservation:
+                    $ref: '#/components/schemas/Reservation'
+
+  /reservations/{id}/reject:
+    post:
+      tags:
+        - Reservas
+      summary: Rechazar reserva
+      description: Rechaza una reserva pendiente (solo Aprobadores)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  example: "Conflicto de horario con otra reunión"
+      responses:
+        '200':
+          description: Reserva rechazada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /reservations/calendar/view:
+    get:
+      tags:
+        - Reservas
+      summary: Vista de calendario
+      description: Obtiene reservas para vista de calendario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2024-12-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2024-12-31"
+        - name: roomId
+          in: query
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Eventos del calendario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reservation'
+
+  /reports/reservations/summary:
+    get:
+      tags:
+        - Reportes
+      summary: Resumen de reservas
+      description: Obtiene estadísticas resumidas de reservas
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Resumen estadístico
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  summary:
+                    type: object
+                    properties:
+                      total_reservations:
+                        type: integer
+                        example: 45
+                      approved_reservations:
+                        type: integer
+                        example: 38
+                      completion_rate:
+                        type: string
+                        example: "84.44"
+                      no_show_rate:
+                        type: string
+                        example: "5.26"
